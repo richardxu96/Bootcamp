@@ -1,87 +1,223 @@
-// from data.js
-var tableData = data;
+// @TODO: YOUR CODE HERE!
+// read the data from the csv file 
 
-// 
-var $tbody = document.querySelector("tbody");
-var $dateInput = document.querySelector("#datetime");
-var $stateInput = document.querySelector("#state");
-var $searchBtn = document.querySelector("#search");
-var $cityInput = document.querySelector("#city");
-var $countryInput = document.querySelector("#country");
-var $shapeInput = document.querySelector("#shape");
+var dataset = []; 
 
-// addresses
-var filteredTable = data;
+d3.csv(".\/assets\/data\/data.csv").then(function(e, csvData){
+    
+        if (e){
+            console.log(e); 
+        }
+        dataset = csvData;
+});
 
-// Tables
-function renderTable() {
-    $tbody.innerHTML = "";
-    for (var i = 0; i < filteredTable.length; i++) {
-      // Get get the current address object and its fields
-      var address = filteredTable[i];
-      console.log(address)
-      var fields = Object.keys(address);
-      // Create a new row in the tbody, set the index to be i + startingIndex
-      var $row = $tbody.insertRow(i);
-      for (var j = 0; j < fields.length; j++) {
-        // For every field in the address object, create a new cell at set its inner text to be the current value at the current address's field
-        var field = fields[j];
-        var $cell = $row.insertCell(j);
-        $cell.innerText = address[field];
-      }
+console.log("data", dataset); 
+
+
+
+
+
+// parse data
+dataset.forEach(function(data){
+    data.poverty = +data.poverty;
+    data.healthcare = +data.healthcare;
+});
+
+Create the svg canvas height and width 
+
+var svgHeight = 400;
+var svgWidth = 900; 
+
+// margins to move your svg to the down and to the right 
+
+var margins = {
+    top: 50, 
+    right: 50,
+    bottom: 50, 
+    left: 50
+};
+
+// Adjust your svg position 
+var width = svgWidth - margin.left - margin.right;
+var height = svgHeight - margin.top - margin.bottom;
+
+// svg wrapper
+var svg = d3.select(".chart")
+  .append("svg")
+  .attr("width", svgWidth)
+  .attr("height", svgHeight);
+
+// Append an SVG group
+var chartGroup = svg.append("g")
+  .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+// Initial Params
+var chosenXAxis = "poverty";
+
+// function used for updating x-scale var upon click on axis label
+function xScale(dataset, chosenXAxis) {
+  // create scales
+  var xLinearScale = d3.scaleLinear()
+    .domain([d3.min(dataset, d => d[chosenXAxis]),
+      d3.max(dataset, d => d[chosenXAxis])
+    ])
+    .range([0, width]);
+
+  return xLinearScale;
+
+}
+
+// function used for updating xAxis var upon click on axis label
+function renderAxes(newXScale, xAxis) {
+    var bottomAxis = d3.axisBottom(newXScale);
+  
+    xAxis.transition()
+      .duration(1000)
+      .call(bottomAxis);
+  
+    return xAxis;
+  }
+
+// function used for updating circles group with a transition to
+// new circles
+function renderCircles(circlesGroup, newXScale, chosenXaxis) {
+
+    circlesGroup.transition()
+      .duration(1000)
+      .attr("cx", d => newXScale(d[chosenXAxis]));
+  
+    return circlesGroup;
+  }
+
+// function used for updating circles group with new tooltip
+function updateToolTip(chosenXAxis, circlesGroup) {
+
+    if (chosenXAxis === "poverty") {
+      var label = "Poverty";
     }
-  }
+    else {
+      var label = "Age (Median)";
+    }
+  
+    var toolTip = d3.tip()
+      .attr("class", "tooltip")
+      .offset([80, -60])
+      .html(function(d) {
+        return (`${d.state}`);
+      });
+      circlesGroup.call(toolTip);
 
-  function handleSearchButtonClick() {
-    // Filter
-      function selectCity(City) {
-        return city.city=searchbutton;
-      }
-
-      var CitySelect = data.filter(selectCity);
-
+      circlesGroup.on("mouseover", function(data) {
+        toolTip.show(data);
+      })
+        // onmouseout event
+        .on("mouseout", function(data, index) {
+        toolTip.hide(data);
+        });
       
+        return circlesGroup;
+}
+
+  // xLinearScale function above csv import
+  var xLinearScale = xScale(dataset, chosenXAxis);
+
+// Create y scale function
+var yLinearScale = d3.scaleLinear()
+    .domain([0, d3.max(dataset, d => d.healthcare)])
+    .range([height, 0]);
+
+// Create initial axis functions
+  var bottomAxis = d3.axisBottom(xLinearScale);
+  var leftAxis = d3.axisLeft(yLinearScale);
+
+// append x axis
+var xAxis = chartGroup.append("g")
+    .classed("x-axis", true)
+    .attr("transform", `translate(0, ${height})`)
+    .call(bottomAxis);
+
+  // append y axis
+  chartGroup.append("g")
+    .call(leftAxis);
+  // append initial circles
+  var circlesGroup = chartGroup.selectAll("circle")
+    .data(dataset)
+    .enter()
+    .append("circle")
+    .attr("cx", d => xLinearScale(d[chosenXAxis]))
+    .attr("cy", d => yLinearScale(d.healthcare))
+    .attr("r", 20)
+    .attr("fill", "pink")
+    .attr("opacity", ".5");
+
+// Create group for  2 x- axis labels
+var labelsGroup = chartGroup.append("g")
+.attr("transform", `translate(${width / 2}, ${height + 20})`);
+
+var PovertyLabel = labelsGroup.append("text")
+.attr("x", 0)
+.attr("y", 20)
+.attr("value", "poverty") // value to grab for event listener
+.classed("active", true)
+.text("Poverty");
+
+var AgeLabel = labelsGroup.append("text")
+.attr("x", 0)
+.attr("y", 40)
+.attr("value", "age") // value to grab for event listener
+.classed("inactive", true)
+.text("Age");
+
+ // append y axis
+  chartGroup.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 0 - margin.left)
+    .attr("x", 0 - (height / 2))
+    .attr("dy", "1em")
+    .classed("axis-text", true)
+    .text("Level of Healthcare");
+
+// updateToolTip function above csv import
+var circlesGroup = updateToolTip(chosenXAxis, circlesGroup);
+
+// x axis labels event listener
+labelsGroup.selectAll("text")
+   .on("click", function() { 
+        // get value of selection
+        var value = d3.select(this).attr("value");
+        if (value !== chosenXAxis) {
+            // replaces chosenXAxis with value
+            chosenXAxis = value;  
+            
+            // functions here found above csv import
+            // updates x scale for new data
+            xLinearScale = xScale(hairData, chosenXAxis);
+
+            // updates x axis with transition
+            xAxis = renderAxes(xLinearScale, xAxis);
+
+            // updates circles with new x values
+            circlesGroup = renderCircles(circlesGroup, xLinearScale, chosenXAxis);
+
+            // updates tooltips with new info
+            circlesGroup = updateToolTip(chosenXAxis, circlesGroup);
+             // changes classes to change bold text
+                if (chosenXAxis === "age") {
+                 AgeLabel
+              .classed("active", true)
+              .classed("inactive", false);
+                PovertyLabel
+              .classed("active", false)
+              .classed("inactive", true);
+          }
+          else {
+            AgeLabel
+              .classed("active", false)
+              .classed("inactive", true);
+            PovertyLabel
+              .classed("active", true)
+              .classed("inactive", false);
+          }
+        }
+      });
   
-    // // Set filteredAddresses to an array of all addresses whose "state" matches the filter
-    // if (filterDate != "")
-    // {
-    //   filteredTable = dataSet.filter(function(address) 
-    //   {
-    //     var addressDate = address.datetime; 
-      
-    //   // If true, add the address to the filteredAddresses, otherwise don't add it to filteredAddresses
-    //   return addressDate === filterDate;
-    //   });
-    // }
-    // else {filteredTable};
-    // if(filterState != "")
-    // {
-    //   filteredTable = filteredTable.filter(function(address)
-    //   {
-    //     var addressState = address.state;
-    //     return addressState === filterState;
-    //   });
-    // }
-    // else{filteredTable};
-  
-    // if(filterCity != "")
-    // {
-    //   filteredTable = filteredTable.filter(function(address)
-    //   {
-    //     var addressCity = address.city;
-    //     return addressCity === filterCity;
-    //   });
-    // }
-  
-    // else{filteredTable};
-  
- 
-  
-  renderTable();
-  
-  }
-  
-  // Render the table for the first time on page load
-  renderTable();
-  
- 
